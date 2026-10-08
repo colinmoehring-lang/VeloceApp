@@ -1,10 +1,13 @@
 package de.veloce.app.data.remote
 
 import de.veloce.app.data.remote.dto.AuthResponseDto
+import de.veloce.app.data.remote.dto.AddRidePointRequestDto
 import de.veloce.app.data.remote.dto.CreateVehicleRequestDto
 import de.veloce.app.data.remote.dto.GenericMessageResponseDto
 import de.veloce.app.data.remote.dto.LogInRequestDto
 import de.veloce.app.data.remote.dto.SignUpRequestDto
+import de.veloce.app.data.remote.dto.StartRideRequestDto
+import de.veloce.app.data.remote.dto.StartRideResponseDto
 import de.veloce.app.data.remote.dto.UpdateVehicleRequestDto
 import de.veloce.app.data.remote.dto.UserRecordsDto
 import de.veloce.app.data.remote.dto.VehicleDto
@@ -40,4 +43,16 @@ interface VeloceApi {
 
     @GET("api/integration/v1/User/records")
     suspend fun getUserRecords(): UserRecordsDto
+
+    @POST("api/integration/v1/Ride/start")
+    suspend fun startRide(@Body body: StartRideRequestDto): StartRideResponseDto
+
+    @POST("api/integration/v1/Ride/{rideId}/point")
+    suspend fun addRidePoint(
+        @Path("rideId") rideId: String,
+        @Body body: AddRidePointRequestDto,
+    ): Response<Unit>
+
+    @POST("api/integration/v1/Ride/{rideId}/stop")
+    suspend fun stopRide(@Path("rideId") rideId: String): Response<Unit>
 }

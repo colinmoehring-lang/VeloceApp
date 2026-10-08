@@ -4,6 +4,7 @@ import de.veloce.app.domain.model.Vehicle
 import de.veloce.app.domain.repository.VehicleRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class CreateVehicleUseCaseTest {
@@ -21,6 +22,18 @@ class CreateVehicleUseCaseTest {
         assertEquals("Tourer", repository.createdName)
         assertEquals("Pendlerfahrzeug", repository.createdDescription)
         assertEquals("Motorcycle", repository.createdType)
+    }
+
+    @Test
+    fun `rejects blank vehicle name`() = runBlocking {
+        val repository = FakeVehicleRepository()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                CreateVehicleUseCase(repository)("", "", "Car", null)
+            }
+        }
+        assertEquals(null, repository.createdName)
     }
 
     private class FakeVehicleRepository : VehicleRepository {

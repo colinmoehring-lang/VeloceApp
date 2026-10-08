@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Veloce Map</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0b0d12; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { opacity: .6; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script>
+  // Der Token wird von der App ersetzt (nicht hier eintragen, nicht ins Repo committen).
+  mapboxgl.accessToken = '__MAPBOX_TOKEN__';
+
+  // ---- Zustand ----------------------------------------------------------
+  let coords = [];          // [[lng, lat], ...]
+  let follow = true;
+  let mode = 'live';        // 'live' = Kamera folgt, 'detail' = ganze Strecke zeigen
+  let ready = false;
+  let lastBearing = -18;
+
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/standard',
+    center: [8.6, 52.3],    // Startansicht, solange es noch keine Position gibt
+    zoom: 15,
+    pitch: 45,
+    bearing: lastBearing,
+    attributionControl: false
+  });
+
+  function lineData() {
+    return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
+  }
+  function pointData() {
+    const last = coords.length ? coords[coords.length - 1] : [0, 0];
+    return { type: 'Feature', geometry: { type: 'Point', coordinates: last } };
+  }
+  function refresh() {
+    if (!ready) return;
+    map.getSource('route-main').setData(lineData());
+    map.getSource('current').setData(pointData());
+  }
+
+  // Richtung zwischen zwei Punkten in Grad (0 = Norden)
+  function bearingBetween(a, b) {
+    const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+    const dLng = toRad(b[0] - a[0]);
+    const y = Math.sin(dLng) * Math.cos(toRad(b[1]));
+    const x = Math.cos(toRad(a[1])) * Math.sin(toRad(b[1])) -
+              Math.sin(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.cos(dLng);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  map.on('style.load', () => {
+    map.setConfigProperty('basemap', 'lightPreset', 'night');
+    map.setConfigProperty('basemap', 'show3dObjects', true);
+
+    map.addSource('route-main', { type: 'geojson', data: lineData() });
+    map.addSource('current',    { type: 'geojson', data: pointData() });
+
+    // Leuchten unter der Linie
+    map.addLayer({
+      id: 'route-glow', type: 'line', source: 'route-main',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#0099ff', 'line-width': 14, 'line-blur': 8, 'line-opacity': 0.85 }
+    });
+    // Helle Hauptlinie
+    map.addLayer({
+      id: 'route-core', type: 'line', source: 'route-main',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': '#33c5ff', 'line-width': 7 }
+    });
+    // Aktuelle Position
+    map.addLayer({
+      id: 'current-halo', type: 'circle', source: 'current',
+      paint: { 'circle-radius': 16, 'circle-color': '#ff8a00', 'circle-opacity': 0.25, 'circle-pitch-alignment': 'map' }
+    });
+    map.addLayer({
+      id: 'current-dot', type: 'circle', source: 'current',
+      paint: { 'circle-radius': 7, 'circle-color': '#ff8a00', 'circle-stroke-color': '#ffffff',
+               'circle-stroke-width': 2, 'circle-pitch-alignment': 'map' }
+    });
+
+    ready = true;
+    refresh();
+    if (window.Android && Android.onMapReady) Android.onMapReady();
+  });
+
+  // ---- API für die App --------------------------------------------------
+  window.veloce = {
+    // Ganze Strecke ersetzen (Fahrt-Details oder nach Wiederherstellung)
+    setRoute(list) {
+      coords = list;
+      refresh();
+      if (mode === 'detail') this.fitRoute();
+    },
+
+    // Neuen Live-Punkt anhängen
+    addPoint(lng, lat, speedKmh) {
+      const p = [lng, lat];
+      const prev = coords.length ? coords[coords.length - 1] : null;
+      coords.push(p);
+      refresh();
+      if (mode !== 'live' || !follow) return;
+
+      // Drehen nur ab ~5 km/h, sonst zittert die Karte durch GPS-Rauschen
+      if (prev && speedKmh > 5) {
+        const b = bearingBetween(prev, p);
+        // Weicher Übergang, kürzester Weg um den Kreis
+        let diff = ((b - lastBearing + 540) % 360) - 180;
+        lastBearing = (lastBearing + diff * 0.5 + 360) % 360;
+      }
+      if (ready) {
+        map.easeTo({ center: p, bearing: lastBearing, pitch: 45, zoom: 16.5,
+                     duration: 500, easing: t => t });
+      }
+    },
+
+    setMode(m) { mode = m; if (m === 'detail') this.fitRoute(); },
+    setFollow(f) { follow = f; },
+
+    fitRoute() {
+      if (!ready || coords.length === 0) return;
+      const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+      map.fitBounds(b, { padding: 60, pitch: 0, bearing: 0, duration: 800, maxZoom: 17 });
+    },
+
+    reset() { coords = []; lastBearing = -18; refresh(); }
+  };
+</script>
+</body>
+</html>

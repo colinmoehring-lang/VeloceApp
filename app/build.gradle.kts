@@ -18,6 +18,7 @@ val localProperties = Properties().apply {
 val apiBaseUrl = localProperties.getProperty("VELOCE_BASE_URL")
     ?: providers.gradleProperty("VELOCE_BASE_URL").orNull
     ?: "https://veloce-knowledgebase.onrender.com"
+val mapboxToken = localProperties.getProperty("MAPBOX_TOKEN").orEmpty()
 
 android {
     namespace = "de.veloce.app"
@@ -30,6 +31,11 @@ android {
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "BASE_URL", "\"${apiBaseUrl.trimEnd('/')}/\"")
+        buildConfigField(
+            "String",
+            "MAPBOX_TOKEN",
+            "\"${mapboxToken.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
