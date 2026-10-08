@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,7 +41,10 @@ import de.veloce.app.presentation.theme.VeloceColors
 import java.util.Locale
 
 @Composable
-fun RideScreen(viewModel: RideViewModel = hiltViewModel()) {
+fun RideScreen(
+    onOpenSettings: () -> Unit,
+    viewModel: RideViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsState()
     val point = state.currentPoint
 
@@ -54,11 +58,40 @@ fun RideScreen(viewModel: RideViewModel = hiltViewModel()) {
         Column {
             Text("Fahrt", style = MaterialTheme.typography.headlineMedium)
             Text(
-                if (state.isRecording) "Messwerte werden live aufgezeichnet"
-                else "Bereit für deine nächste Fahrt",
+                when {
+                    state.isRecording -> "Messwerte werden live aufgezeichnet"
+                    state.dataSource == de.veloce.app.domain.model.RideDataSource.ARDUINO ->
+                        "Datenquelle: Arduino (Bluetooth)"
+                    else -> "Datenquelle: Simulator"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = VeloceColors.Muted,
             )
+        }
+
+        if (
+            state.dataSource == de.veloce.app.domain.model.RideDataSource.ARDUINO &&
+            !state.isArduinoConnected &&
+            !state.isRecording
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = VeloceColors.PaleOrange,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Kein Arduino verbunden. Verbinde das Gerät in den Einstellungen, bevor du startest.",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = VeloceColors.Ink,
+                    )
+                    TextButton(onClick = onOpenSettings) { Text("Einstellungen") }
+                }
+            }
         }
 
         Row(
@@ -182,7 +215,15 @@ fun RideScreen(viewModel: RideViewModel = hiltViewModel()) {
                 state.stopPending -> viewModel::retryStop
                 else -> viewModel::startRecording
             },
-            enabled = !state.isStarting && !state.isStopping,
+            enabled = !state.isStarting &&
+                !state.isStopping &&
+                !state.isLoadingSettings &&
+                (
+                    state.isRecording ||
+                        state.stopPending ||
+                        state.dataSource != de.veloce.app.domain.model.RideDataSource.ARDUINO ||
+                        state.isArduinoConnected
+                    ),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp),

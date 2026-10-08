@@ -4,10 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.veloce.app.BuildConfig
+import de.veloce.app.data.ble.BleTelemetrySource
+import de.veloce.app.data.repository.SettingsStore
+import de.veloce.app.data.simulator.SimulatedTelemetrySource
 import de.veloce.app.data.remote.ApiException
 import de.veloce.app.presentation.components.MapPoint
 import de.veloce.app.domain.model.TelemetryPoint
-import de.veloce.app.domain.repository.TelemetrySource
+import de.veloce.app.domain.model.ConnectionState
+import de.veloce.app.domain.model.RideDataSource
+import de.veloce.app.domain.repository.BleConnection
 import de.veloce.app.domain.usecase.RecordRideUseCase
 import de.veloce.app.domain.usecase.StartRideUseCase
 import de.veloce.app.domain.usecase.StopRideUseCase
@@ -28,6 +33,9 @@ data class RideUiState(
     val isStopping: Boolean = false,
     val stopPending: Boolean = false,
     val vehicleType: String = "Motorcycle",
+    val dataSource: RideDataSource = RideDataSource.SIMULATOR,
+    val isLoadingSettings: Boolean = true,
+    val isArduinoConnected: Boolean = false,
     val currentPoint: TelemetryPoint? = null,
     val route: List<MapPoint> = emptyList(),
     val error: String? = null,
@@ -38,7 +46,10 @@ class RideViewModel @Inject constructor(
     private val startRide: StartRideUseCase,
     private val recordRide: RecordRideUseCase,
     private val stopRide: StopRideUseCase,
-    private val telemetrySource: TelemetrySource,
+    private val simulatorSource: SimulatedTelemetrySource,
+    private val bleTelemetrySource: BleTelemetrySource,
+    private val bleConnection: BleConnection,
+    private val settingsStore: SettingsStore,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(RideUiState())
     val state = mutableState.asStateFlow()
@@ -46,6 +57,21 @@ class RideViewModel @Inject constructor(
 
     private var rideId: String? = null
     private var telemetryJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            settingsStore.rideDataSource.collect { dataSource ->
+                mutableState.update { it.copy(dataSource = dataSource, isLoadingSettings = false) }
+            }
+        }
+        viewModelScope.launch {
+            bleConnection.state.collect { connectionState ->
+                mutableState.update {
+                    it.copy(isArduinoConnected = connectionState is ConnectionState.Connected)
+                }
+            }
+        }
+    }
 
     fun selectVehicleType(vehicleType: String) {
         if (vehicleType == "Car" || vehicleType == "Motorcycle") {
@@ -55,6 +81,18 @@ class RideViewModel @Inject constructor(
 
     fun startRecording() {
         if (mutableState.value.isStarting || mutableState.value.isRecording) return
+        val source = when (mutableState.value.dataSource) {
+            RideDataSource.SIMULATOR -> simulatorSource
+            RideDataSource.ARDUINO -> {
+                if (!mutableState.value.isArduinoConnected) {
+                    mutableState.update {
+                        it.copy(error = "Verbinde zuerst dein Arduino-Gerät in den Einstellungen.")
+                    }
+                    return
+                }
+                bleTelemetrySource
+            }
+        }
         mutableState.update { it.copy(isStarting = true, error = null, stopPending = false) }
         viewModelScope.launch {
             try {
@@ -70,7 +108,7 @@ class RideViewModel @Inject constructor(
                     )
                 }
                 telemetryJob = viewModelScope.launch {
-                    telemetrySource.points().collect { point ->
+                    source.points().collect { point ->
                         mutableState.update { previous ->
                             previous.copy(
                                 currentPoint = point,

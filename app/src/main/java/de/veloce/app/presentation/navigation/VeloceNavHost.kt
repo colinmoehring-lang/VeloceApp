@@ -114,7 +114,9 @@ fun VeloceNavHost() {
                     onVehiclesChanged = homeViewModel::refresh,
                 )
             }
-            composable(Routes.Ride) { RideScreen() }
+            composable(Routes.Ride) {
+                RideScreen(onOpenSettings = { navController.navigate(Routes.Settings) })
+            }
             composable(Routes.RideList) { RideListScreen() }
             composable(Routes.Settings) {
                 SettingsScreen(onLogout = authViewModel::logOut)
