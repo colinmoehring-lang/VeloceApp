@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import de.veloce.app.domain.model.Vehicle
+import de.veloce.app.presentation.components.ListRow
 import de.veloce.app.presentation.components.SectionHeader
 import de.veloce.app.presentation.components.StatCard
 import de.veloce.app.presentation.components.VeloceCard
