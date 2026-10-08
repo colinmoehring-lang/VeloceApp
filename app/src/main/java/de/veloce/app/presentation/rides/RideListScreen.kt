@@ -1,23 +1,21 @@
-package de.veloce.app.presentation.settings
+package de.veloce.app.presentation.rides
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import de.veloce.app.presentation.theme.VeloceColors
 
 @Composable
-fun SettingsScreen(onLogout: () -> Unit) {
+fun RideListScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -26,18 +24,12 @@ fun SettingsScreen(onLogout: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Einstellungen", style = MaterialTheme.typography.headlineMedium)
+        Text("Fahrten", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "Einstellungen kommen später.",
-            modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
+            "Hier werden deine Fahrten angezeigt, sobald sie verfügbar sind.",
+            modifier = Modifier.padding(top = 8.dp),
             color = VeloceColors.Muted,
+            textAlign = TextAlign.Center,
         )
-        Button(
-            onClick = onLogout,
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = VeloceColors.Ink),
-        ) {
-            Text("Abmelden")
-        }
     }
 }
