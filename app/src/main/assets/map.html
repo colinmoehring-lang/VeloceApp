@@ -1,140 +1,65 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <title>Veloce Map</title>
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
-  <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #0b0d12; }
-    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-    .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { opacity: .6; }
-  </style>
+<meta charset="utf-8" />
+<title>Veloce Map</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+html,body{margin:0;padding:0;height:100%;width:100%;overflow:hidden;background:#e7e6e1}
+#map{position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;background:#e7e6e1}
+#err{position:absolute;left:8px;right:8px;bottom:8px;display:none;padding:8px 10px;font:12px/1.4 sans-serif;color:#fff;background:rgba(180,30,30,.9);border-radius:8px;z-index:1000}
+</style>
 </head>
 <body>
 <div id="map"></div>
-
+<div id="err"></div>
 <script>
-  // Der Token wird von der App ersetzt (nicht hier eintragen, nicht ins Repo committen).
-  mapboxgl.accessToken = '__MAPBOX_TOKEN__';
-
-  // ---- Zustand ----------------------------------------------------------
-  let coords = [];          // [[lng, lat], ...]
-  let follow = true;
-  let mode = 'live';        // 'live' = Kamera folgt, 'detail' = ganze Strecke zeigen
-  let ready = false;
-  let lastBearing = -18;
-
-  const map = new mapboxgl.Map({
-    container: 'map',
-    style: 'mapbox://styles/mapbox/standard',
-    center: [8.6, 52.3],    // Startansicht, solange es noch keine Position gibt
-    zoom: 15,
-    pitch: 45,
-    bearing: lastBearing,
-    attributionControl: false
-  });
-
-  function lineData() {
-    return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
-  }
-  function pointData() {
-    const last = coords.length ? coords[coords.length - 1] : [0, 0];
-    return { type: 'Feature', geometry: { type: 'Point', coordinates: last } };
-  }
-  function refresh() {
-    if (!ready) return;
-    map.getSource('route-main').setData(lineData());
-    map.getSource('current').setData(pointData());
-  }
-
-  // Richtung zwischen zwei Punkten in Grad (0 = Norden)
-  function bearingBetween(a, b) {
-    const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
-    const dLng = toRad(b[0] - a[0]);
-    const y = Math.sin(dLng) * Math.cos(toRad(b[1]));
-    const x = Math.cos(toRad(a[1])) * Math.sin(toRad(b[1])) -
-              Math.sin(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.cos(dLng);
-    return (toDeg(Math.atan2(y, x)) + 360) % 360;
-  }
-
-  map.on('style.load', () => {
-    map.setConfigProperty('basemap', 'lightPreset', 'night');
-    map.setConfigProperty('basemap', 'show3dObjects', true);
-
-    map.addSource('route-main', { type: 'geojson', data: lineData() });
-    map.addSource('current',    { type: 'geojson', data: pointData() });
-
-    // Leuchten unter der Linie
-    map.addLayer({
-      id: 'route-glow', type: 'line', source: 'route-main',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#0099ff', 'line-width': 14, 'line-blur': 8, 'line-opacity': 0.85 }
-    });
-    // Helle Hauptlinie
-    map.addLayer({
-      id: 'route-core', type: 'line', source: 'route-main',
-      layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#33c5ff', 'line-width': 7 }
-    });
-    // Aktuelle Position
-    map.addLayer({
-      id: 'current-halo', type: 'circle', source: 'current',
-      paint: { 'circle-radius': 16, 'circle-color': '#ff8a00', 'circle-opacity': 0.25, 'circle-pitch-alignment': 'map' }
-    });
-    map.addLayer({
-      id: 'current-dot', type: 'circle', source: 'current',
-      paint: { 'circle-radius': 7, 'circle-color': '#ff8a00', 'circle-stroke-color': '#ffffff',
-               'circle-stroke-width': 2, 'circle-pitch-alignment': 'map' }
-    });
-
-    ready = true;
-    refresh();
-    if (window.Android && Android.onMapReady) Android.onMapReady();
-  });
-
-  // ---- API für die App --------------------------------------------------
-  window.veloce = {
-    // Ganze Strecke ersetzen (Fahrt-Details oder nach Wiederherstellung)
-    setRoute(list) {
-      coords = list;
-      refresh();
-      if (mode === 'detail') this.fitRoute();
-    },
-
-    // Neuen Live-Punkt anhängen
-    addPoint(lng, lat, speedKmh) {
-      const p = [lng, lat];
-      const prev = coords.length ? coords[coords.length - 1] : null;
-      coords.push(p);
-      refresh();
-      if (mode !== 'live' || !follow) return;
-
-      // Drehen nur ab ~5 km/h, sonst zittert die Karte durch GPS-Rauschen
-      if (prev && speedKmh > 5) {
-        const b = bearingBetween(prev, p);
-        // Weicher Übergang, kürzester Weg um den Kreis
-        let diff = ((b - lastBearing + 540) % 360) - 180;
-        lastBearing = (lastBearing + diff * 0.5 + 360) % 360;
-      }
-      if (ready) {
-        map.easeTo({ center: p, bearing: lastBearing, pitch: 45, zoom: 16.5,
-                     duration: 500, easing: t => t });
-      }
-    },
-
-    setMode(m) { mode = m; if (m === 'detail') this.fitRoute(); },
-    setFollow(f) { follow = f; },
-
-    fitRoute() {
-      if (!ready || coords.length === 0) return;
-      const b = coords.reduce((bb, c) => bb.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
-      map.fitBounds(b, { padding: 60, pitch: 0, bearing: 0, duration: 800, maxZoom: 17 });
-    },
-
-    reset() { coords = []; lastBearing = -18; refresh(); }
-  };
+function showErr(t){try{var e=document.getElementById("err");e.style.display="block";e.textContent=t;}catch(_){}}
+function hideErr(){try{document.getElementById("err").style.display="none";}catch(_){}}
+window.onerror=function(msg,src,line){console.error("JS error: "+msg+" ("+src+":"+line+")");showErr("JS error: "+msg);};
+window.addEventListener("unhandledrejection",function(e){console.error("Promise error: "+e.reason);});
+var TOKEN="__MAPBOX_TOKEN__";
+var PLACEHOLDER="__MAPBOX"+"_TOKEN__";
+var hasToken=TOKEN&&TOKEN!==PLACEHOLDER&&TOKEN.indexOf("pk.")===0;
+console.log("Token vorhanden="+hasToken+" len="+(TOKEN?TOKEN.length:0));
+console.log("Fenster: "+window.innerWidth+"x"+window.innerHeight);
+var map=L.map("map",{zoomControl:false,attributionControl:true}).setView([52.3,8.6],15);
+map.attributionControl.setPrefix(false);
+map.attributionControl.addAttribution("Mapbox OSM");
+var tileUrl;
+if(hasToken){tileUrl="https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token="+TOKEN;}
+else{tileUrl="https://tile.openstreetmap.org/{z}/{x}/{y}.png";showErr("Mapbox-Token fehlt - OSM Fallback");}
+console.log("Tile-URL Vorlage bereit, mapbox="+hasToken);
+var tiles=L.tileLayer(tileUrl,{maxZoom:19,tileSize:256,detectRetina:false,errorTileUrl:""}).addTo(map);
+var tileOk=0,tileErr=0;
+tiles.on("tileload",function(){tileOk++;if(tileOk===1){console.log("Erste Kachel geladen");hideErr();}if(tileOk%20===0){console.log("Kacheln ok="+tileOk+" err="+tileErr);}});
+tiles.on("tileerror",function(e){tileErr++;var u="";try{u=e.tile?e.tile.src:"";}catch(_){}console.error("Kachel-Fehler #"+tileErr+" "+u);if(tileOk===0){showErr("Kacheln laden nicht ("+tileErr+"). Netz/Token pruefen.");}});
+map.on("load",function(){console.log("Leaflet load event");});
+setTimeout(function(){try{map.invalidateSize();console.log("invalidateSize "+window.innerWidth+"x"+window.innerHeight+" kacheln ok="+tileOk+" err="+tileErr);if(window.Android&&Android.onMapReady)Android.onMapReady();setTimeout(function(){map.invalidateSize();},500);}catch(e){console.error("init Fehler: "+e);}},300);
+var coords=[];var follow=true;var mode="live";var ready=true;
+var line=L.polyline([],{color:"#33c5ff",weight:7,opacity:1,lineJoin:"round"}).addTo(map);
+var glow=L.polyline([],{color:"#0099ff",weight:14,opacity:0.35,lineJoin:"round"}).addTo(map);
+var dot=L.circleMarker([52.3,8.6],{radius:7,color:"#ffffff",weight:2,fillColor:"#ff8a00",fillOpacity:1}).addTo(map);
+var halo=L.circleMarker([52.3,8.6],{radius:16,color:"#ff8a00",weight:0,fillColor:"#ff8a00",fillOpacity:0.25}).addTo(map);
+function refresh(){
+try{
+var latlngs=coords.map(function(c){return [c[1],c[0]];});
+line.setLatLngs(latlngs);glow.setLatLngs(latlngs);
+if(latlngs.length){var last=latlngs[latlngs.length-1];dot.setLatLng(last);halo.setLatLng(last);}
+}catch(e){console.error("refresh Fehler: "+e);}
+}
+function centerOn(lngLat,zoom){try{map.setView([lngLat[1],lngLat[0]],zoom||map.getZoom(),{animate:true});}catch(e){}}
+window.veloce={
+setRoute:function(list){coords=list||[];refresh();if(mode==="detail")this.fitRoute();},
+addPoint:function(lng,lat,speed){var p=[lng,lat];coords.push(p);refresh();if(mode!=="live"||!follow)return;try{map.panTo([lat,lng],{animate:true});}catch(e){}},
+setMode:function(m){mode=m;if(m==="detail")this.fitRoute();},
+setFollow:function(f){follow=f;},
+fitRoute:function(){if(!coords.length)return;try{var b=L.latLngBounds(coords.map(function(c){return [c[1],c[0]];}));map.fitBounds(b,{padding:[60,60],maxZoom:17,animate:true});}catch(e){console.error("fitRoute Fehler: "+e);}}, 
+reset:function(){coords=[];refresh();}
+};
+console.log("Leaflet bereit");
 </script>
 </body>
 </html>

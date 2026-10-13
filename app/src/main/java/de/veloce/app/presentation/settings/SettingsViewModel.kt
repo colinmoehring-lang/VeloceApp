@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class SettingsUiState(
     val devices: List<BleDevice> = emptyList(),
@@ -38,6 +39,9 @@ data class SettingsUiState(
     val invalidLineCount: Int = 0,
     val latestTelemetry: de.veloce.app.domain.model.TelemetryPoint? = null,
     val writeError: String? = null,
+    val leanOffset: Double = 0.0,
+    val isCalibrating: Boolean = false,
+    val calibrationMessage: String? = null,
 )
 
 @HiltViewModel
@@ -103,6 +107,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsStore.rideDataSource.collect { source ->
                 mutableState.update { it.copy(dataSource = source) }
+            }
+        }
+        viewModelScope.launch {
+            settingsStore.leanOffsetDegrees.collect { offset ->
+                mutableState.update { it.copy(leanOffset = offset) }
             }
         }
     }
@@ -203,6 +212,55 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Mittelt die über [CALIBRATION_WINDOW_MS] eingehenden Tilt-Rohwerte und
+     * speichert sie als Montage-Offset. Das Motorrad sollte dabei gerade stehen.
+     */
+    fun calibrateLean() {
+        if (mutableState.value.isCalibrating) return
+        if (mutableState.value.connectionState !is ConnectionState.Connected) {
+            mutableState.update {
+                it.copy(calibrationMessage = "Verbinde zuerst dein Arduino-Gerät.")
+            }
+            return
+        }
+        viewModelScope.launch {
+            mutableState.update { it.copy(isCalibrating = true, calibrationMessage = null) }
+            val samples = mutableListOf<Double>()
+            try {
+                withTimeoutOrNull(CALIBRATION_WINDOW_MS) {
+                    connection.lines.collect { line ->
+                        line.point?.let { samples += it.leanDegrees }
+                    }
+                }
+            } finally {
+                mutableState.update { it.copy(isCalibrating = false) }
+            }
+            if (samples.size < MIN_CALIBRATION_SAMPLES) {
+                mutableState.update {
+                    it.copy(
+                        calibrationMessage =
+                            "Zu wenige Messwerte – prüfe die Verbindung und versuche es erneut.",
+                    )
+                }
+                return@launch
+            }
+            settingsStore.setLeanOffset(samples.average())
+            mutableState.update {
+                it.copy(calibrationMessage = "Kalibrierung gespeichert.")
+            }
+        }
+    }
+
+    fun resetLeanOffset() {
+        viewModelScope.launch {
+            settingsStore.clearLeanOffset()
+            mutableState.update {
+                it.copy(leanOffset = 0.0, calibrationMessage = "Offset zurückgesetzt.")
+            }
+        }
+    }
+
     fun toggleTerminalExpanded() {
         mutableState.update { it.copy(terminalExpanded = !it.terminalExpanded) }
     }
@@ -246,6 +304,8 @@ class SettingsViewModel @Inject constructor(
     private companion object {
         const val MAX_TERMINAL_LINES = 200
         const val SCAN_DURATION_MS = 10_000L
+        const val CALIBRATION_WINDOW_MS = 2_500L
+        const val MIN_CALIBRATION_SAMPLES = 2
     }
 }
 

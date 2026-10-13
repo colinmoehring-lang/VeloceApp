@@ -297,6 +297,18 @@ fun SettingsScreen(
         }
 
         if (state.connectionState is ConnectionState.Connected) {
+            item { SectionHeader("Kalibrierung") }
+            item {
+                CalibrationCard(
+                    rawTiltDegrees = state.latestTelemetry?.leanDegrees,
+                    offsetDegrees = state.leanOffset,
+                    isCalibrating = state.isCalibrating,
+                    message = state.calibrationMessage,
+                    onCalibrate = viewModel::calibrateLean,
+                    onReset = viewModel::resetLeanOffset,
+                )
+            }
+
             item { SectionHeader("Terminal (Debug)", onAction = viewModel::toggleTerminalExpanded) }
             item {
                 TerminalCard(
@@ -389,6 +401,73 @@ private fun DeviceRow(device: BleDevice, enabled: Boolean, onClick: () -> Unit) 
             )
         },
     )
+}
+
+@Composable
+private fun CalibrationCard(
+    rawTiltDegrees: Double?,
+    offsetDegrees: Double,
+    isCalibrating: Boolean,
+    message: String?,
+    onCalibrate: () -> Unit,
+    onReset: () -> Unit,
+) {
+    VeloceCard {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Schräglage kalibrieren", fontWeight = FontWeight.Medium)
+            Text(
+                "Stell das Motorrad gerade hin und drücke dann auf Kalibrieren. Der aktuelle " +
+                    "Messwert wird als Montage-Offset gespeichert und von allen zukünftigen " +
+                    "Schräglage-Werten (Anzeige und Upload) abgezogen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = VeloceColors.Muted,
+            )
+            Text(
+                if (rawTiltDegrees != null) {
+                    "Roh: ${rawTiltDegrees.display()}° · Offset: ${offsetDegrees.display()}° · " +
+                        "korrigiert: ${(rawTiltDegrees - offsetDegrees).display()}°"
+                } else {
+                    "Noch keine gültigen Messwerte."
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+            message?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = VeloceColors.Muted)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = onCalibrate,
+                    enabled = !isCalibrating,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = VeloceColors.Ink),
+                ) {
+                    if (isCalibrating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text(" Kalibriere …")
+                    } else {
+                        Text("Kalibrieren")
+                    }
+                }
+                TextButton(
+                    onClick = onReset,
+                    enabled = !isCalibrating && offsetDegrees != 0.0,
+                ) {
+                    Text("Offset zurücksetzen")
+                }
+            }
+        }
+    }
 }
 
 @Composable

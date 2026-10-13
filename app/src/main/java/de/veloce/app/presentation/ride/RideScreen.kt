@@ -1,5 +1,10 @@
-package de.veloce.app.presentation.ride
+﻿package de.veloce.app.presentation.ride
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,9 +35,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import de.veloce.app.presentation.components.MapMode
 import de.veloce.app.presentation.components.RideMap
@@ -47,6 +54,27 @@ fun RideScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val point = state.currentPoint
+
+    val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* Aufzeichnung läuft unabhängig von der Notification-Berechtigung. */ }
+
+    // Beim Start ggf. die Benachrichtigungs-Berechtigung anfragen (Android 13+),
+    // damit die Foreground-Service-Meldung sichtbar wird. Die Aufzeichnung
+    // selbst startet auch ohne diese Berechtigung.
+    val startAction: () -> Unit = {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        viewModel.startRecording()
+    }
 
     Column(
         modifier = Modifier
@@ -154,7 +182,6 @@ fun RideScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .clip(RoundedCornerShape(24.dp))
                 .background(ColorMapBackground),
         ) {
             if (viewModel.mapboxToken.isNotBlank()) {
@@ -213,7 +240,7 @@ fun RideScreen(
             onClick = when {
                 state.isRecording -> viewModel::stopRecording
                 state.stopPending -> viewModel::retryStop
-                else -> viewModel::startRecording
+                else -> startAction
             },
             enabled = !state.isStarting &&
                 !state.isStopping &&
