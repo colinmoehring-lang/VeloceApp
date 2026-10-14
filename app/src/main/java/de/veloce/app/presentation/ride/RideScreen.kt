@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,15 +33,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import de.veloce.app.presentation.components.MapMode
-import de.veloce.app.presentation.components.RideMap
 import de.veloce.app.presentation.components.StatCard
 import de.veloce.app.presentation.theme.VeloceColors
 import java.util.Locale
@@ -178,53 +172,19 @@ fun RideScreen(
             }
         }
 
+        // Platzhalter: Die Karte wurde vorübergehend entfernt.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .background(ColorMapBackground),
+                .background(ColorMapPlaceholder, RoundedCornerShape(22.dp)),
+            contentAlignment = Alignment.Center,
         ) {
-            if (viewModel.mapboxToken.isNotBlank()) {
-                RideMap(
-                    route = state.route,
-                    speedKmh = point?.speedKmh ?: 0.0,
-                    mode = MapMode.LIVE,
-                    mapboxToken = viewModel.mapboxToken,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                if (point == null || !point.hasValidCoordinates) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(12.dp),
-                        color = VeloceColors.Surface.copy(alpha = 0.94f),
-                        shape = RoundedCornerShape(50),
-                    ) {
-                        Text(
-                            if (state.isRecording) "Warte auf GPS" else "Karte für die Fahrt",
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text("Karte nicht konfiguriert", fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Füge MAPBOX_TOKEN in local.properties ein, um die Karte anzuzeigen.",
-                        color = VeloceColors.Muted,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
+            Text(
+                "Kartenansicht folgt",
+                color = VeloceColors.Muted,
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
 
         state.error?.let {
@@ -276,7 +236,7 @@ fun RideScreen(
     }
 }
 
-private val ColorMapBackground get() = androidx.compose.ui.graphics.Color(0xFFE7E6E1)
+private val ColorMapPlaceholder get() = androidx.compose.ui.graphics.Color(0xFFE7E6E1)
 
 private fun Double.formatOneDecimal(): String =
     String.format(Locale.GERMANY, "%.1f", this)

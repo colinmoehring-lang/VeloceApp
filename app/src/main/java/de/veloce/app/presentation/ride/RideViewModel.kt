@@ -2,7 +2,6 @@ package de.veloce.app.presentation.ride
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import de.veloce.app.BuildConfig
 import de.veloce.app.data.ride.RideRecordingController
 import de.veloce.app.data.ride.RideRecordingState
 import javax.inject.Inject
@@ -20,7 +19,6 @@ class RideViewModel @Inject constructor(
     private val controller: RideRecordingController,
 ) : ViewModel() {
     val state: StateFlow<RideRecordingState> = controller.state
-    val mapboxToken: String = BuildConfig.MAPBOX_TOKEN
 
     fun selectVehicleType(vehicleType: String) = controller.selectVehicleType(vehicleType)
 
