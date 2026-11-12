@@ -7,7 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.DirectionsCar
@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import de.veloce.app.presentation.components.RideMap
 import de.veloce.app.presentation.components.StatCard
 import de.veloce.app.presentation.theme.VeloceColors
 import java.util.Locale
@@ -172,20 +173,15 @@ fun RideScreen(
             }
         }
 
-        // Platzhalter: Die Karte wurde vorübergehend entfernt.
-        Box(
+        RideMap(
+            route = state.route,
+            currentPoint = point,
+            speedKmh = point?.speedKmh ?: 0.0,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .background(ColorMapPlaceholder, RoundedCornerShape(22.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "Kartenansicht folgt",
-                color = VeloceColors.Muted,
-                style = MaterialTheme.typography.labelSmall,
-            )
-        }
+                .clip(RoundedCornerShape(22.dp)),
+        )
 
         state.error?.let {
             Text(
@@ -235,8 +231,6 @@ fun RideScreen(
         }
     }
 }
-
-private val ColorMapPlaceholder get() = androidx.compose.ui.graphics.Color(0xFFE7E6E1)
 
 private fun Double.formatOneDecimal(): String =
     String.format(Locale.GERMANY, "%.1f", this)

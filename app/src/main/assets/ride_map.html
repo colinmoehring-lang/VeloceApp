@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #0b0d12;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #loading-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #0b0d12;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      color: #94a3b8;
+      font-size: 13px;
+      transition: opacity 0.4s ease;
+      padding: 16px;
+      text-align: center;
+    }
+    .spinner {
+      width: 26px;
+      height: 26px;
+      border: 3px solid rgba(255, 255, 255, 0.12);
+      border-top-color: #0099ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .live-marker {
+      width: 18px;
+      height: 18px;
+      border: 3px solid white;
+      border-radius: 50%;
+      background: #00bfff;
+      box-shadow: 0 0 12px 5px rgba(0, 153, 255, .7);
+    }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<div id="loading-overlay">
+  <div class="spinner" id="loading-spinner"></div>
+  <div id="loading-text">Karte wird geladen...</div>
+</div>
+<script>
+  (() => {
+    let map;
+    let liveMarker;
+    let lastPosition = null;
+    let lastFitRoute = '';
+    let pendingUpdate = { route: [], currentPoint: null };
+    let pendingAccessToken = null;
+    let initAttempts = 0;
+    let overlayHidden = false;
+
+    function reportMapError(message) {
+      const textElem = document.getElementById('loading-text');
+      const spinnerElem = document.getElementById('loading-spinner');
+      if (spinnerElem) spinnerElem.style.display = 'none';
+      if (textElem) textElem.textContent = message;
+      if (window.RideMapBridge) {
+        window.RideMapBridge.onMapError(String(message).slice(0, 240));
+      }
+    }
+
+    function hideLoadingOverlay() {
+      if (overlayHidden) return;
+      overlayHidden = true;
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.style.display = 'none'; }, 400);
+      }
+    }
+
+    window.addEventListener('error', event => {
+      reportMapError(`JavaScript error: ${event.message || 'unknown error'}`);
+    });
+
+    window.addEventListener('unhandledrejection', event => {
+      reportMapError(`Map request failed: ${event.reason?.message || 'unknown error'}`);
+    });
+
+    function validPoint(point) {
+      return point &&
+        Number.isFinite(point.lat) &&
+        Number.isFinite(point.lng) &&
+        point.lat >= -90 && point.lat <= 90 &&
+        point.lng >= -180 && point.lng <= 180 &&
+        (point.lat !== 0 || point.lng !== 0);
+    }
+
+    function render(update) {
+      if (!map) return;
+      if (map.isStyleLoaded()) {
+        const coordinates = update.route
+          .filter(validPoint)
+          .map(point => [point.lng, point.lat]);
+        const source = map.getSource('ride-route');
+        if (source) {
+          const features = [];
+          if (coordinates.length > 1) {
+            features.push({
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates },
+              properties: { role: 'route' }
+            });
+          }
+          coordinates.forEach((coordinate, index) => {
+            features.push({
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: coordinate },
+              properties: {
+                role: index === 0
+                  ? 'start'
+                  : index === coordinates.length - 1
+                    ? 'finish'
+                    : 'sample'
+              }
+            });
+          });
+          source.setData({
+            type: 'FeatureCollection',
+            features
+          });
+        }
+
+        const point = validPoint(update.currentPoint) ? update.currentPoint : null;
+        if (liveMarker) {
+          liveMarker.getElement().title = Number.isFinite(update.speedKmh)
+            ? `${update.speedKmh.toFixed(1)} km/h`
+            : '';
+          if (!point) {
+            liveMarker.getElement().style.visibility = 'hidden';
+            lastPosition = null;
+            if (coordinates.length > 0) {
+              const routeKey = coordinates.map(([lng, lat]) => `${lng},${lat}`).join(';');
+              if (routeKey !== lastFitRoute) {
+                lastFitRoute = routeKey;
+                if (coordinates.length === 1) {
+                  map.flyTo({ center: coordinates[0], zoom: 16.8, duration: 350 });
+                } else {
+                  const bounds = coordinates.slice(1).reduce(
+                    (result, coordinate) => result.extend(coordinate),
+                    new mapboxgl.LngLatBounds(coordinates[0], coordinates[0])
+                  );
+                  map.fitBounds(bounds, { padding: 32, maxZoom: 16.8, duration: 350 });
+                }
+              }
+            }
+          } else {
+            const moved = !lastPosition ||
+              lastPosition.lat !== point.lat ||
+              lastPosition.lng !== point.lng;
+            if (moved) {
+              liveMarker.setLngLat([point.lng, point.lat]);
+              liveMarker.getElement().style.visibility = 'visible';
+              map.flyTo({ center: [point.lng, point.lat], duration: 900 });
+              lastPosition = { lat: point.lat, lng: point.lng };
+            }
+          }
+        }
+      }
+    }
+
+    window.updateRideMap = update => {
+      pendingUpdate = update;
+      if (map) {
+        map.resize();
+        render(pendingUpdate);
+      }
+    };
+
+    function createMap(accessToken) {
+      mapboxgl.accessToken = accessToken;
+      map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: [11.642, 48.138],
+        zoom: 16.8,
+        pitch: 45,
+        bearing: -18,
+        trackResize: true,
+        preserveDrawingBuffer: true
+      });
+
+      map.on('error', event => {
+        const status = event.error?.status;
+        if (status === 401 || status === 403) {
+          reportMapError(
+            `Mapbox rejected the token (HTTP ${status}). Check token permissions and URL restrictions.`
+          );
+        } else {
+          reportMapError(
+            `Mapbox map error${status ? ` (HTTP ${status})` : ''}: ` +
+              (event.error?.message || 'unknown error')
+          );
+        }
+      });
+
+      liveMarker = new mapboxgl.Marker({ element: createMarkerElement() })
+        .setLngLat([11.642, 48.138])
+        .addTo(map);
+      liveMarker.getElement().style.visibility = 'hidden';
+
+      map.on('style.load', () => {
+        try {
+          map.addSource('ride-route', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+          });
+          map.addLayer({
+            id: 'ride-route-glow',
+            type: 'line',
+            source: 'ride-route',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: {
+              'line-color': '#0099ff',
+              'line-width': 14,
+              'line-blur': 8,
+              'line-opacity': 0.85
+            }
+          });
+          map.addLayer({
+            id: 'ride-route-core',
+            type: 'line',
+            source: 'ride-route',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#33c5ff', 'line-width': 7 }
+          });
+          map.addLayer({
+            id: 'ride-route-markers',
+            type: 'circle',
+            source: 'ride-route',
+            filter: ['==', ['geometry-type'], 'Point'],
+            paint: {
+              'circle-radius': [
+                'case',
+                ['==', ['get', 'role'], 'start'], 6,
+                ['==', ['get', 'role'], 'finish'], 6,
+                2
+              ],
+              'circle-color': [
+                'match',
+                ['get', 'role'],
+                'start', '#22c55e',
+                'finish', '#ef4444',
+                '#ffffff'
+              ],
+              'circle-stroke-width': 1.5,
+              'circle-stroke-color': '#101318'
+            }
+          });
+          map.resize();
+          render(pendingUpdate);
+          if (window.RideMapBridge) window.RideMapBridge.onMapReady();
+        } catch (error) {
+          reportMapError(`Map style initialization failed: ${error.message || 'unknown error'}`);
+        }
+      });
+
+      // Hide loading overlay when map tiles finish rendering
+      map.on('load', () => {
+        map.resize();
+        hideLoadingOverlay();
+      });
+
+      map.on('idle', () => {
+        map.resize();
+        hideLoadingOverlay();
+      });
+
+      // Safety fallback to hide overlay after 3.5s if idle event hasn't fired
+      setTimeout(() => {
+        if (map && map.isStyleLoaded()) {
+          map.resize();
+          hideLoadingOverlay();
+        }
+      }, 3500);
+
+      new ResizeObserver(() => map.resize()).observe(document.getElementById('map'));
+      setTimeout(() => map.resize(), 500);
+      setTimeout(() => map.resize(), 1500);
+    }
+
+    window.initializeMapbox = accessToken => {
+      if (map) return;
+      pendingAccessToken = accessToken;
+
+      function tryStart() {
+        if (map) return;
+        if (window.mapboxgl) {
+          try {
+            createMap(pendingAccessToken);
+          } catch (error) {
+            reportMapError(`Map initialization failed: ${error.message || 'unknown error'}`);
+          }
+        } else {
+          initAttempts++;
+          if (initAttempts < 100) {
+            setTimeout(tryStart, 100);
+          } else {
+            reportMapError('Mapbox GL JS did not load. Check internet connection.');
+          }
+        }
+      }
+
+      tryStart();
+    };
+
+    function createMarkerElement() {
+      const element = document.createElement('div');
+      element.className = 'live-marker';
+      return element;
+    }
+  })();
+</script>
+</body>
+</html>

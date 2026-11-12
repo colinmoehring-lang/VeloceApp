@@ -26,18 +26,18 @@ private fun String.apiMessage(): String {
     }
     return when (element) {
         is JsonPrimitive -> element.content
-        is JsonObject -> sequenceOf("detail", "message", "title")
-            .mapNotNull { (element[it] as? JsonPrimitive)?.content }
-            .firstOrNull { it.isNotBlank() }
-            ?: (element["errors"] as? JsonObject)?.values
-                ?.firstNotNullOfOrNull { value ->
-                    when (value) {
-                        is JsonArray -> value.firstNotNullOfOrNull { (it as? JsonPrimitive)?.content }
-                        is JsonPrimitive -> value.content
-                        else -> null
-                    }
-                }
+        is JsonObject -> element["errors"]?.firstErrorMessage()
+            ?.takeIf { it.isNotBlank() }
+            ?: sequenceOf("detail", "message", "title")
+                .mapNotNull { (element[it] as? JsonPrimitive)?.content }
+                .firstOrNull { it.isNotBlank() }
                 .orEmpty()
         else -> ""
     }
+}
+
+private fun kotlinx.serialization.json.JsonElement.firstErrorMessage(): String? = when (this) {
+    is JsonPrimitive -> content.takeIf { isString && it.isNotBlank() }
+    is JsonArray -> firstNotNullOfOrNull { it.firstErrorMessage() }
+    is JsonObject -> values.firstNotNullOfOrNull { it.firstErrorMessage() }
 }

@@ -11,25 +11,26 @@ import org.junit.Test
 
 class LoginUseCaseTest {
     @Test
-    fun `trims username and delegates credentials`() = runBlocking {
+    fun `trims email and delegates credentials`() = runBlocking {
         val repository = FakeAuthRepository()
 
-        LoginUseCase(repository)("  veloce-user  ", "secret")
+        LoginUseCase(repository)("  veloce@example.com  ", "secret")
 
-        assertEquals("veloce-user", repository.userName)
+        assertEquals("veloce@example.com", repository.email)
         assertEquals("secret", repository.password)
     }
 
     private class FakeAuthRepository : AuthRepository {
-        var userName: String? = null
+        var email: String? = null
         var password: String? = null
 
         override fun observeSession(): Flow<AuthSession?> = flowOf(null)
-        override suspend fun logIn(userName: String, password: String) {
-            this.userName = userName
+        override suspend fun logIn(email: String, password: String) {
+            this.email = email
             this.password = password
         }
-        override suspend fun signUp(userName: String, password: String) = Unit
+        override suspend fun signUp(email: String, password: String) = Unit
+        override suspend fun verifyEmail(email: String, code: String) = Unit
         override suspend fun logOut() = Unit
     }
 }

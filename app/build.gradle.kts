@@ -18,6 +18,14 @@ val localProperties = Properties().apply {
 val apiBaseUrl = localProperties.getProperty("VELOCE_BASE_URL")
     ?: providers.gradleProperty("VELOCE_BASE_URL").orNull
     ?: "https://veloce-knowledgebase.onrender.com"
+val mapboxAccessToken = localProperties.getProperty("MAPBOX_ACCESS_TOKEN")
+    ?: providers.gradleProperty("MAPBOX_ACCESS_TOKEN").orNull
+    ?: ""
+val escapedMapboxAccessToken = mapboxAccessToken
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+    .replace("\n", "")
+    .replace("\r", "")
 
 android {
     namespace = "de.veloce.app"
@@ -30,6 +38,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "BASE_URL", "\"${apiBaseUrl.trimEnd('/')}/\"")
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$escapedMapboxAccessToken\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

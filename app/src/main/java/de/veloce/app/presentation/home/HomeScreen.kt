@@ -29,7 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -41,8 +41,8 @@ import de.veloce.app.presentation.components.ListRow
 import de.veloce.app.presentation.components.SectionHeader
 import de.veloce.app.presentation.components.StatCard
 import de.veloce.app.presentation.components.VeloceCard
+import de.veloce.app.presentation.rides.RideHistoryCard
 import de.veloce.app.presentation.theme.VeloceColors
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -55,7 +55,9 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    val lean = maxOf(abs(state.records.leanLeftDegrees), abs(state.records.leanRightDegrees))
+    val latestRide = state.latestRide
+    val leftLean = abs(state.records.leanLeftDegrees).coerceIn(0.0, 45.0)
+    val rightLean = abs(state.records.leanRightDegrees).coerceIn(0.0, 45.0)
 
     LazyColumn(
         modifier = Modifier
@@ -92,7 +94,7 @@ fun HomeScreen(
                 ) {
                     Text("HÖCHSTE SCHRÄGLAGE", style = MaterialTheme.typography.labelSmall, color = VeloceColors.Muted)
                     Spacer(Modifier.height(8.dp))
-                    LeanGauge(lean)
+                    LeanGauge(leftLean, rightLean)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -172,24 +174,68 @@ fun HomeScreen(
             }
         }
         item {
-            SectionHeader("Letzte Fahrten", onAction = onOpenRides)
+            SectionHeader("Letzte Fahrt", onAction = onOpenRides)
         }
         item {
-            VeloceCard {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
-                ) {
-                    Text("Noch keine Fahrten", fontWeight = FontWeight.Medium)
-                    Text(
-                        "Deine letzten Fahrten erscheinen hier.",
-                        color = VeloceColors.Muted,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
+            when {
+                state.isLoadingRides && latestRide == null -> {
+                    VeloceCard {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+
+                latestRide != null -> {
+                    RideHistoryCard(
+                        ride = latestRide,
+                        route = state.latestRideRoute,
+                        isRouteLoading = state.isLoadingLatestRideRoute,
+                        routeError = state.rideRouteError,
+                        showRoute = true,
+                        onToggleRoute = null,
                     )
+                }
+
+                state.ridesError != null -> {
+                    VeloceCard {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = state.ridesError.orEmpty(),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            TextButton(onClick = viewModel::refresh) { Text("Fahrten erneut laden") }
+                        }
+                    }
+                }
+
+                else -> {
+                    VeloceCard {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            Text("Noch keine Fahrten", fontWeight = FontWeight.Medium)
+                            Text(
+                                "Deine letzte Fahrt erscheint hier.",
+                                color = VeloceColors.Muted,
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -208,49 +254,50 @@ private fun VehiclePreview(vehicle: Vehicle) {
 }
 
 @Composable
-private fun LeanGauge(value: Double) {
-    val boundedValue = value.coerceIn(0.0, 45.0)
+private fun LeanGauge(leftLean: Double, rightLean: Double) {
+    val signedLean = if (leftLean > rightLean) -leftLean else rightLean
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(106.dp),
+                .height(136.dp),
         ) {
             val centerX = size.width / 2f
             val baseline = size.height - 10.dp.toPx()
-            val radius = minOf(size.width * 0.37f, baseline - 4.dp.toPx())
-            val arc = Path().apply {
-                moveTo(centerX - radius, baseline)
-                quadraticTo(centerX, baseline - 2 * radius, centerX + radius, baseline)
-            }
-            drawPath(
-                path = arc,
+            val radiusX = size.width * 0.48f
+            val radiusY = minOf(size.width * 0.78f, baseline - 4.dp.toPx())
+            drawArc(
                 color = VeloceColors.Orange,
+                startAngle = 210f,
+                sweepAngle = 120f,
+                useCenter = false,
+                topLeft = Offset(centerX - radiusX, baseline - radiusY),
+                size = Size(radiusX * 2, radiusY * 2),
                 style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round),
             )
             for (tick in 0..9) {
-                val angle = PI + (PI * tick / 9.0)
-                val inner = radius - if (tick % 3 == 0) 11.dp.toPx() else 7.dp.toPx()
+                val angle = Math.toRadians(210.0 + 120.0 * tick / 9.0)
+                val innerOffset = if (tick % 3 == 0) 11.dp.toPx() else 7.dp.toPx()
                 drawLine(
                     color = VeloceColors.Orange.copy(alpha = 0.65f),
                     start = Offset(
-                        centerX + cos(angle).toFloat() * inner,
-                        baseline + sin(angle).toFloat() * inner,
+                        centerX + cos(angle).toFloat() * (radiusX - innerOffset),
+                        baseline + sin(angle).toFloat() * (radiusY - innerOffset),
                     ),
                     end = Offset(
-                        centerX + cos(angle).toFloat() * (radius + 1.dp.toPx()),
-                        baseline + sin(angle).toFloat() * (radius + 1.dp.toPx()),
+                        centerX + cos(angle).toFloat() * (radiusX + 1.dp.toPx()),
+                        baseline + sin(angle).toFloat() * (radiusY + 1.dp.toPx()),
                     ),
                     strokeWidth = 1.5.dp.toPx(),
                 )
             }
-            val needleAngle = PI + (PI * boundedValue / 45.0)
+            val needleAngle = Math.toRadians(270.0 + signedLean)
             drawLine(
                 color = VeloceColors.Ink,
                 start = Offset(centerX, baseline),
                 end = Offset(
-                    centerX + cos(needleAngle).toFloat() * (radius - 15.dp.toPx()),
-                    baseline + sin(needleAngle).toFloat() * (radius - 15.dp.toPx()),
+                    centerX + cos(needleAngle).toFloat() * (radiusX - 20.dp.toPx()),
+                    baseline + sin(needleAngle).toFloat() * (radiusY - 15.dp.toPx()),
                 ),
                 strokeWidth = 2.dp.toPx(),
                 cap = StrokeCap.Round,
@@ -259,16 +306,52 @@ private fun LeanGauge(value: Double) {
         }
         Row(
             modifier = Modifier
-                .fillMaxWidth(0.76f)
+                .fillMaxWidth(0.88f)
                 .padding(top = 1.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
         ) {
-            Text("0°", style = MaterialTheme.typography.labelSmall, color = VeloceColors.Muted)
-            Text("${boundedValue.displayValue()}°", style = MaterialTheme.typography.titleMedium, color = VeloceColors.Orange)
-            Text("45°", style = MaterialTheme.typography.labelSmall, color = VeloceColors.Muted)
+            LeanRecordValue(
+                label = "Links",
+                value = leftLean,
+                modifier = Modifier.weight(1f),
+                alignment = TextAlign.Start,
+            )
+            LeanRecordValue(
+                label = "Gerade",
+                value = 0.0,
+                modifier = Modifier.weight(1f),
+                alignment = TextAlign.Center,
+            )
+            LeanRecordValue(
+                label = "Rechts",
+                value = rightLean,
+                modifier = Modifier.weight(1f),
+                alignment = TextAlign.End,
+            )
         }
-        Text("Höchste Schräglage", style = MaterialTheme.typography.bodySmall, color = VeloceColors.Muted)
         Spacer(Modifier.height(10.dp))
+    }
+}
+
+@Composable
+private fun LeanRecordValue(
+    label: String,
+    value: Double,
+    modifier: Modifier,
+    alignment: TextAlign,
+) {
+    Column(modifier = modifier, horizontalAlignment = when (alignment) {
+        TextAlign.Start -> Alignment.Start
+        TextAlign.End -> Alignment.End
+        else -> Alignment.CenterHorizontally
+    }) {
+        Text(
+            "${value.displayValue()}°",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (label == "Gerade") VeloceColors.Muted else VeloceColors.Orange,
+            textAlign = alignment,
+        )
+        Text(label, style = MaterialTheme.typography.labelSmall, color = VeloceColors.Muted)
     }
 }
 

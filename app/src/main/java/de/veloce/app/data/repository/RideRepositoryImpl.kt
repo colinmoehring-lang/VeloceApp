@@ -2,8 +2,12 @@ package de.veloce.app.data.repository
 
 import de.veloce.app.data.remote.VeloceApi
 import de.veloce.app.data.remote.toApiException
+import de.veloce.app.data.mapper.toDomain
+import de.veloce.app.data.mapper.toMapPointOrNull
 import de.veloce.app.data.remote.dto.AddRidePointRequestDto
 import de.veloce.app.data.remote.dto.StartRideRequestDto
+import de.veloce.app.domain.model.MapPoint
+import de.veloce.app.domain.model.RideHistoryItem
 import de.veloce.app.domain.model.TelemetryPoint
 import de.veloce.app.domain.repository.RideRepository
 import java.util.Locale
@@ -45,6 +49,16 @@ class RideRepositoryImpl @Inject constructor(
 
     override suspend fun stopRide(rideId: String) {
         callApi { requireSuccess(api.stopRide(rideId)) }
+    }
+
+    override suspend fun getRides(): List<RideHistoryItem> = callApi {
+        api.getRides()
+            .map { it.toDomain() }
+            .sortedByDescending { it.startedAt }
+    }
+
+    override suspend fun getRideRoute(rideId: String): List<MapPoint> = callApi {
+        api.getRidePointCoordinates(rideId).mapNotNull(String::toMapPointOrNull)
     }
 
     private fun requireSuccess(response: Response<Unit>) {

@@ -11,6 +11,8 @@ import de.veloce.app.domain.repository.VehicleRepository
 import de.veloce.app.domain.usecase.CreateVehicleUseCase
 import de.veloce.app.domain.usecase.DeleteVehicleUseCase
 import de.veloce.app.domain.usecase.GetPersonalRecordsUseCase
+import de.veloce.app.domain.usecase.GetRideRouteUseCase
+import de.veloce.app.domain.usecase.GetRidesUseCase
 import de.veloce.app.domain.usecase.GetVehiclesUseCase
 import de.veloce.app.domain.usecase.LoginUseCase
 import de.veloce.app.domain.usecase.RecordRideUseCase
@@ -18,6 +20,7 @@ import de.veloce.app.domain.usecase.SignUpUseCase
 import de.veloce.app.domain.usecase.StartRideUseCase
 import de.veloce.app.domain.usecase.StopRideUseCase
 import de.veloce.app.domain.usecase.UpdateVehicleUseCase
+import de.veloce.app.domain.usecase.VerifyEmailUseCase
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -27,6 +30,9 @@ object UseCaseModule {
 
     @Provides
     fun provideSignUpUseCase(repository: AuthRepository) = SignUpUseCase(repository)
+
+    @Provides
+    fun provideVerifyEmailUseCase(repository: AuthRepository) = VerifyEmailUseCase(repository)
 
     @Provides
     fun provideCreateVehicleUseCase(repository: VehicleRepository) = CreateVehicleUseCase(repository)
@@ -42,6 +48,12 @@ object UseCaseModule {
 
     @Provides
     fun provideGetRecordsUseCase(repository: RecordsRepository) = GetPersonalRecordsUseCase(repository)
+
+    @Provides
+    fun provideGetRidesUseCase(repository: RideRepository) = GetRidesUseCase(repository)
+
+    @Provides
+    fun provideGetRideRouteUseCase(repository: RideRepository) = GetRideRouteUseCase(repository)
 
     @Provides
     fun provideStartRideUseCase(repository: RideRepository) = StartRideUseCase(repository)

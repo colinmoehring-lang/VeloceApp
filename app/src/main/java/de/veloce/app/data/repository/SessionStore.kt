@@ -29,7 +29,7 @@ class SessionStore @Inject constructor(
     suspend fun save(session: AuthSession) {
         dataStore.edit { preferences ->
             preferences[ACCESS_TOKEN] = session.accessToken
-            preferences[USER_NAME] = session.userName
+            preferences[EMAIL] = session.email
             preferences[USER_ID] = session.userId.toString()
             preferences[EXPIRES_IN] = session.expiresInSeconds
         }
@@ -41,19 +41,19 @@ class SessionStore @Inject constructor(
 
     private fun Preferences.toSession(): AuthSession? {
         val token = this[ACCESS_TOKEN] ?: return null
-        val userName = this[USER_NAME] ?: return null
+        val email = this[EMAIL] ?: return null
         val id = this[USER_ID] ?: return null
         val userId = try {
             UUID.fromString(id)
         } catch (_: IllegalArgumentException) {
             return null
         }
-        return AuthSession(token, this[EXPIRES_IN] ?: 0, userId, userName)
+        return AuthSession(token, this[EXPIRES_IN] ?: 0, userId, email)
     }
 
     private companion object {
         val ACCESS_TOKEN = stringPreferencesKey("access_token")
-        val USER_NAME = stringPreferencesKey("user_name")
+        val EMAIL = stringPreferencesKey("email")
         val USER_ID = stringPreferencesKey("user_id")
         val EXPIRES_IN = intPreferencesKey("expires_in_seconds")
     }

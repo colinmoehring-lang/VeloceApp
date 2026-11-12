@@ -1,6 +1,8 @@
 package de.veloce.app.domain.usecase
 
 import de.veloce.app.domain.model.TelemetryPoint
+import de.veloce.app.domain.model.MapPoint
+import de.veloce.app.domain.model.RideHistoryItem
 import de.veloce.app.domain.repository.RideRepository
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -38,5 +40,9 @@ class RecordRideUseCaseTest {
         }
 
         override suspend fun stopRide(rideId: String) = Unit
+
+        override suspend fun getRides(): List<RideHistoryItem> = emptyList()
+
+        override suspend fun getRideRoute(rideId: String): List<MapPoint> = emptyList()
     }
 }

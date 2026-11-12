@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -29,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -37,8 +39,10 @@ import de.veloce.app.presentation.theme.VeloceColors
 @Composable
 fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
-    var userName by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    val isVerificationStep = state.isVerificationStep
+    val passwordHints = "Mindestens 8 Zeichen, ein Groß- und Kleinbuchstabe, eine Ziffer und ein Sonderzeichen."
 
     Box(
         modifier = Modifier
@@ -60,30 +64,57 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    if (state.isSignUp) "Konto erstellen" else "Willkommen zurück",
+                    when {
+                        isVerificationStep -> "E-Mail bestätigen"
+                        state.isSignUp -> "Konto erstellen"
+                        else -> "Willkommen zurück"
+                    },
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    if (state.isSignUp) "Erstelle dein Veloce-Konto." else "Melde dich an und entdecke deine Fahrten.",
+                    when {
+                        isVerificationStep -> "Gib den 6-stelligen Code aus deiner E-Mail ein."
+                        state.isSignUp -> "Erstelle dein Veloce-Konto."
+                        else -> "Melde dich an und entdecke deine Fahrten."
+                    },
                     color = VeloceColors.Muted,
                 )
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
-                    value = userName,
-                    onValueChange = { userName = it },
-                    label = { Text("Benutzername") },
+                    value = state.email,
+                    onValueChange = viewModel::updateEmail,
+                    label = { Text("E-Mail") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Passwort") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (isVerificationStep) {
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it.filter { character -> character in '0'..'9' }.take(6) },
+                        label = { Text("6-stelliger Verifizierungscode") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Passwort") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (state.isSignUp) {
+                        Text(
+                            passwordHints,
+                            color = VeloceColors.Muted,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
                 state.error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
@@ -91,7 +122,10 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                     Text(it, color = VeloceColors.Green, style = MaterialTheme.typography.bodySmall)
                 }
                 Button(
-                    onClick = { viewModel.submit(userName, password) },
+                    onClick = {
+                        if (isVerificationStep) viewModel.verifyCode(code)
+                        else viewModel.submit(password)
+                    },
                     enabled = !state.isBusy,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -106,7 +140,22 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text(if (state.isSignUp) "Konto erstellen" else "Anmelden")
+                        Text(
+                            when {
+                                isVerificationStep -> "Code bestätigen"
+                                state.isSignUp -> "Konto erstellen"
+                                else -> "Anmelden"
+                            },
+                        )
+                    }
+                }
+                if (isVerificationStep) {
+                    TextButton(
+                        onClick = { viewModel.resendVerificationCode(password) },
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        enabled = !state.isBusy,
+                    ) {
+                        Text("Code erneut senden", color = VeloceColors.Muted)
                     }
                 }
                 TextButton(
@@ -115,7 +164,9 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                     enabled = !state.isBusy,
                 ) {
                     Text(
-                        if (state.isSignUp) "Schon ein Konto? Anmelden" else "Noch kein Konto? Registrieren",
+                        if (state.isSignUp) "Schon ein Konto? Anmelden"
+                        else if (isVerificationStep) "Zur Anmeldung"
+                        else "Noch kein Konto? Registrieren",
                         color = VeloceColors.Muted,
                     )
                 }
