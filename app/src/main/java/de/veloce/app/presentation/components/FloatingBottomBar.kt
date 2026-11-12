@@ -1,7 +1,11 @@
 package de.veloce.app.presentation.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -11,9 +15,12 @@ import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -35,34 +42,56 @@ fun FloatingBottomBar(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.shadow(12.dp, CircleShape, ambientColor = Color(0x1A000000)),
+        modifier = modifier.shadow(
+            elevation = 16.dp,
+            shape = CircleShape,
+            ambientColor = Color(0x20000000),
+            spotColor = Color(0x1A000000),
+        ),
         shape = CircleShape,
         color = Color.White,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MainTab.entries.forEach { tab ->
                 val selected = selectedRoute == tab.route
+                val pillColor by animateColorAsState(
+                    targetValue = if (selected) VeloceColors.Ink else Color.Transparent,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "tabPillColor",
+                )
+                val textColor by animateColorAsState(
+                    targetValue = if (selected) Color.White else VeloceColors.Muted,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "tabTextColor",
+                )
+
                 Row(
                     modifier = Modifier
-                        .background(
-                            if (selected) VeloceColors.Ink else Color.Transparent,
-                            CircleShape,
-                        )
-                        .clickable { onSelect(tab.route) }
-                        .padding(horizontal = if (selected) 15.dp else 12.dp, vertical = 11.dp),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        .background(pillColor, CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onSelect(tab.route) }
+                        .padding(horizontal = if (selected) 18.dp else 14.dp, vertical = 11.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        tab.icon,
+                        imageVector = tab.icon,
                         contentDescription = tab.label,
-                        tint = if (selected) Color.White else VeloceColors.Muted,
+                        tint = textColor,
                     )
-                    if (selected) Text(tab.label, color = Color.White)
+                    if (selected) {
+                        Text(
+                            text = tab.label,
+                            color = textColor,
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                    }
                 }
             }
         }

@@ -62,8 +62,10 @@
   (() => {
     let map;
     let liveMarker;
+    let startMarker;
+    let endMarker;
     let lastPosition = null;
-    let lastFitRoute = '';
+    let lastFittedRouteKey = null;
     let pendingUpdate = { route: [], currentPoint: null };
     let pendingAccessToken = null;
     let initAttempts = 0;
@@ -87,6 +89,18 @@
         overlay.style.opacity = '0';
         setTimeout(() => { overlay.style.display = 'none'; }, 400);
       }
+    }
+
+    function createPointMarkerElement(color, title) {
+      const el = document.createElement('div');
+      el.style.width = '14px';
+      el.style.height = '14px';
+      el.style.borderRadius = '50%';
+      el.style.border = '2.5px solid white';
+      el.style.backgroundColor = color;
+      el.style.boxShadow = '0 0 8px rgba(0, 0, 0, 0.6)';
+      if (title) el.title = title;
+      return el;
     }
 
     window.addEventListener('error', event => {
@@ -114,67 +128,66 @@
           .map(point => [point.lng, point.lat]);
         const source = map.getSource('ride-route');
         if (source) {
-          const features = [];
-          if (coordinates.length > 1) {
-            features.push({
-              type: 'Feature',
-              geometry: { type: 'LineString', coordinates },
-              properties: { role: 'route' }
-            });
-          }
-          coordinates.forEach((coordinate, index) => {
-            features.push({
-              type: 'Feature',
-              geometry: { type: 'Point', coordinates: coordinate },
-              properties: {
-                role: index === 0
-                  ? 'start'
-                  : index === coordinates.length - 1
-                    ? 'finish'
-                    : 'sample'
-              }
-            });
-          });
           source.setData({
             type: 'FeatureCollection',
-            features
+            features: coordinates.length > 1 ? [{
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates },
+              properties: {}
+            }] : []
           });
         }
 
-        const point = validPoint(update.currentPoint) ? update.currentPoint : null;
+        const isLiveMode = validPoint(update.currentPoint);
+        const current = isLiveMode ? update.currentPoint : null;
+
         if (liveMarker) {
           liveMarker.getElement().title = Number.isFinite(update.speedKmh)
             ? `${update.speedKmh.toFixed(1)} km/h`
             : '';
-          if (!point) {
+          if (!current) {
             liveMarker.getElement().style.visibility = 'hidden';
-            lastPosition = null;
-            if (coordinates.length > 0) {
-              const routeKey = coordinates.map(([lng, lat]) => `${lng},${lat}`).join(';');
-              if (routeKey !== lastFitRoute) {
-                lastFitRoute = routeKey;
-                if (coordinates.length === 1) {
-                  map.flyTo({ center: coordinates[0], zoom: 16.8, duration: 350 });
-                } else {
-                  const bounds = coordinates.slice(1).reduce(
-                    (result, coordinate) => result.extend(coordinate),
-                    new mapboxgl.LngLatBounds(coordinates[0], coordinates[0])
-                  );
-                  map.fitBounds(bounds, { padding: 32, maxZoom: 16.8, duration: 350 });
-                }
-              }
-            }
           } else {
             const moved = !lastPosition ||
-              lastPosition.lat !== point.lat ||
-              lastPosition.lng !== point.lng;
+              lastPosition.lat !== current.lat ||
+              lastPosition.lng !== current.lng;
             if (moved) {
-              liveMarker.setLngLat([point.lng, point.lat]);
+              liveMarker.setLngLat([current.lng, current.lat]);
               liveMarker.getElement().style.visibility = 'visible';
-              map.flyTo({ center: [point.lng, point.lat], duration: 900 });
-              lastPosition = { lat: point.lat, lng: point.lng };
+              map.flyTo({ center: [current.lng, current.lat], duration: 900 });
+              lastPosition = { lat: current.lat, lng: current.lng };
             }
           }
+        }
+
+        if (!isLiveMode && coordinates.length > 0) {
+          const routeKey = coordinates.length + '_' + coordinates[0].join(',') + '_' + coordinates[coordinates.length - 1].join(',');
+          if (lastFittedRouteKey !== routeKey) {
+            lastFittedRouteKey = routeKey;
+
+            const bounds = new mapboxgl.LngLatBounds();
+            coordinates.forEach(c => bounds.extend(c));
+            map.fitBounds(bounds, { padding: 45, duration: 800, maxZoom: 16.5 });
+
+            if (!startMarker) {
+              startMarker = new mapboxgl.Marker({ element: createPointMarkerElement('#2e7d32', 'Start') }).addTo(map);
+            }
+            startMarker.setLngLat(coordinates[0]);
+            startMarker.getElement().style.visibility = 'visible';
+
+            if (coordinates.length > 1) {
+              if (!endMarker) {
+                endMarker = new mapboxgl.Marker({ element: createPointMarkerElement('#e58a45', 'Ziel') }).addTo(map);
+              }
+              endMarker.setLngLat(coordinates[coordinates.length - 1]);
+              endMarker.getElement().style.visibility = 'visible';
+            } else if (endMarker) {
+              endMarker.getElement().style.visibility = 'hidden';
+            }
+          }
+        } else {
+          if (startMarker) startMarker.getElement().style.visibility = 'hidden';
+          if (endMarker) endMarker.getElement().style.visibility = 'hidden';
         }
       }
     }
@@ -244,29 +257,6 @@
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: { 'line-color': '#33c5ff', 'line-width': 7 }
           });
-          map.addLayer({
-            id: 'ride-route-markers',
-            type: 'circle',
-            source: 'ride-route',
-            filter: ['==', ['geometry-type'], 'Point'],
-            paint: {
-              'circle-radius': [
-                'case',
-                ['==', ['get', 'role'], 'start'], 6,
-                ['==', ['get', 'role'], 'finish'], 6,
-                2
-              ],
-              'circle-color': [
-                'match',
-                ['get', 'role'],
-                'start', '#22c55e',
-                'finish', '#ef4444',
-                '#ffffff'
-              ],
-              'circle-stroke-width': 1.5,
-              'circle-stroke-color': '#101318'
-            }
-          });
           map.resize();
           render(pendingUpdate);
           if (window.RideMapBridge) window.RideMapBridge.onMapReady();
@@ -275,7 +265,6 @@
         }
       });
 
-      // Hide loading overlay when map tiles finish rendering
       map.on('load', () => {
         map.resize();
         hideLoadingOverlay();
@@ -286,7 +275,6 @@
         hideLoadingOverlay();
       });
 
-      // Safety fallback to hide overlay after 3.5s if idle event hasn't fired
       setTimeout(() => {
         if (map && map.isStyleLoaded()) {
           map.resize();

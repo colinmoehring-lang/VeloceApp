@@ -1,13 +1,21 @@
 package de.veloce.app.presentation.rides
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.DirectionsBike
+import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,6 +29,7 @@ import de.veloce.app.domain.model.MapPoint
 import de.veloce.app.domain.model.RideHistoryItem
 import de.veloce.app.presentation.components.RideMap
 import de.veloce.app.presentation.components.StatCard
+import de.veloce.app.presentation.components.StatusChip
 import de.veloce.app.presentation.components.VeloceCard
 import de.veloce.app.presentation.theme.VeloceColors
 import java.time.ZoneId
@@ -47,17 +56,46 @@ fun RideHistoryCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = ride.vehicleType.toVehicleLabel(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = ride.startedAt.atZone(ZoneId.systemDefault())
-                        .format(DateTimeFormatter.ofPattern("dd.MM.yyyy · HH:mm", Locale.GERMANY)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = VeloceColors.Muted,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(VeloceColors.Background, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (ride.vehicleType == "Motorcycle") Icons.AutoMirrored.Outlined.DirectionsBike else Icons.Outlined.DirectionsCar,
+                            contentDescription = null,
+                            tint = VeloceColors.Ink,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = ride.vehicleType.toVehicleLabel(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = ride.startedAt.atZone(ZoneId.systemDefault())
+                                .format(DateTimeFormatter.ofPattern("dd.MM.yyyy · HH:mm", Locale.GERMANY)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = VeloceColors.Muted,
+                        )
+                    }
+                }
+                StatusChip(
+                    text = "${(distanceMeters / 1000.0).formatOneDecimal()} km",
+                    background = VeloceColors.Background,
+                    foreground = VeloceColors.Ink,
                 )
             }
 
@@ -90,14 +128,24 @@ fun RideHistoryCard(
                     onClick = onToggleRoute,
                     modifier = Modifier.align(Alignment.Start),
                 ) {
-                    Text(if (showRoute) "Karte ausblenden" else "Route auf Karte")
+                    Text(
+                        text = if (showRoute) "Karte ausblenden" else "Route auf Karte",
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
 
             if (showRoute) {
                 when {
                     isRouteLoading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
 
                     routeError != null -> {

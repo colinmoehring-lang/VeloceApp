@@ -37,8 +37,12 @@ fun VeloceCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(10.dp, RoundedCornerShape(22.dp), ambientColor = Color(0x14000000))
-            .background(VeloceColors.Surface, RoundedCornerShape(22.dp)),
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = Color(0x18000000),
+                spotColor = Color(0x10000000),
+            ),
         shape = RoundedCornerShape(22.dp),
         color = VeloceColors.Surface,
     ) {
@@ -86,17 +90,31 @@ fun StatCard(
 ) {
     Column(
         modifier = modifier.padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = VeloceColors.Muted)
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = VeloceColors.Muted,
+        )
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(
-                value,
+                text = value,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 color = valueColor,
             )
-            Text(unit, style = MaterialTheme.typography.bodySmall, color = VeloceColors.Muted)
+            if (unit.isNotBlank()) {
+                Text(
+                    text = unit,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = VeloceColors.Muted,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+            }
         }
     }
 }
@@ -111,9 +129,13 @@ fun StatusChip(
     Box(
         modifier = modifier
             .background(background, CircleShape)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = foreground)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = foreground,
+        )
     }
 }
 
@@ -140,16 +162,41 @@ fun ListRow(
                 .background(VeloceColors.Background, RoundedCornerShape(14.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = VeloceColors.Ink, modifier = Modifier.size(20.dp))
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = VeloceColors.Ink,
+                modifier = Modifier.size(20.dp),
+            )
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = VeloceColors.Muted)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = VeloceColors.Muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (trailing != null) {
             trailing()
         } else if (onClick != null) {
-            Icon(Icons.Outlined.ChevronRight, contentDescription = "Öffnen", tint = VeloceColors.Muted)
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = "Öffnen",
+                tint = VeloceColors.Muted,
+            )
         } else {
             Spacer(Modifier.size(4.dp))
         }

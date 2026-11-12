@@ -5,8 +5,15 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,8 +21,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.DirectionsCar
@@ -33,7 +40,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,9 +65,6 @@ fun RideScreen(
         ActivityResultContracts.RequestPermission(),
     ) { /* Aufzeichnung läuft unabhängig von der Notification-Berechtigung. */ }
 
-    // Beim Start ggf. die Benachrichtigungs-Berechtigung anfragen (Android 13+),
-    // damit die Foreground-Service-Meldung sichtbar wird. Die Aufzeichnung
-    // selbst startet auch ohne diese Berechtigung.
     val startAction: () -> Unit = {
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -71,6 +78,17 @@ fun RideScreen(
         viewModel.startRecording()
     }
 
+    val infiniteTransition = rememberInfiniteTransition(label = "recordingDot")
+    val dotAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "alpha",
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -78,18 +96,37 @@ fun RideScreen(
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column {
-            Text("Fahrt", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                when {
-                    state.isRecording -> "Messwerte werden live aufgezeichnet"
-                    state.dataSource == de.veloce.app.domain.model.RideDataSource.ARDUINO ->
-                        "Datenquelle: Arduino (Bluetooth)"
-                    else -> "Datenquelle: Simulator"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = VeloceColors.Muted,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("Fahrt", style = MaterialTheme.typography.headlineMedium)
+                    if (state.isRecording) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(VeloceColors.Error.copy(alpha = dotAlpha), CircleShape),
+                        )
+                    }
+                }
+                Text(
+                    when {
+                        state.isRecording -> "Messwerte werden live aufgezeichnet"
+                        state.dataSource == de.veloce.app.domain.model.RideDataSource.ARDUINO ->
+                            "Datenquelle: Arduino (Bluetooth)"
+                        else -> "Datenquelle: Simulator"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.isRecording) VeloceColors.Error else VeloceColors.Muted,
+                    fontWeight = if (state.isRecording) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            }
         }
 
         if (
@@ -162,6 +199,7 @@ fun RideScreen(
                         value = point?.leanDegrees?.formatOneDecimal() ?: "0,0",
                         unit = "°",
                         modifier = Modifier.weight(1f),
+                        valueColor = if (state.isRecording && (point?.leanDegrees ?: 0.0) > 20.0) VeloceColors.Orange else VeloceColors.Ink,
                     )
                     StatCard(
                         label = "G-Kraft",
@@ -192,6 +230,11 @@ fun RideScreen(
             )
         }
 
+        val buttonColor by animateColorAsState(
+            targetValue = if (state.isRecording) VeloceColors.Error else VeloceColors.Ink,
+            label = "recordButtonColor",
+        )
+
         Button(
             onClick = when {
                 state.isRecording -> viewModel::stopRecording
@@ -211,9 +254,7 @@ fun RideScreen(
                 .fillMaxWidth()
                 .height(54.dp),
             shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (state.isRecording) VeloceColors.Error else VeloceColors.Ink,
-            ),
+            colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
         ) {
             when {
                 state.isStarting || state.isStopping -> {
@@ -224,9 +265,9 @@ fun RideScreen(
                     )
                 }
 
-                state.isRecording -> Text("Fahrt stoppen")
-                state.stopPending -> Text("Abschluss erneut senden")
-                else -> Text("Fahrt starten")
+                state.isRecording -> Text("Fahrt stoppen", fontWeight = FontWeight.SemiBold)
+                state.stopPending -> Text("Abschluss erneut senden", fontWeight = FontWeight.SemiBold)
+                else -> Text("Fahrt starten", fontWeight = FontWeight.SemiBold)
             }
         }
     }

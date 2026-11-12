@@ -82,14 +82,14 @@ fun HomeScreen(
                     Text("Deine Fahrten", style = MaterialTheme.typography.headlineMedium)
                 }
                 IconButton(onClick = onLogout) {
-                    Icon(Icons.Outlined.Logout, contentDescription = "Abmelden")
+                    Icon(Icons.Outlined.Logout, contentDescription = "Abmelden", tint = VeloceColors.Ink)
                 }
             }
         }
         item {
             VeloceCard {
                 Column(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 17.dp),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text("HÖCHSTE SCHRÄGLAGE", style = MaterialTheme.typography.labelSmall, color = VeloceColors.Muted)
@@ -299,10 +299,10 @@ private fun LeanGauge(leftLean: Double, rightLean: Double) {
                     centerX + cos(needleAngle).toFloat() * (radiusX - 20.dp.toPx()),
                     baseline + sin(needleAngle).toFloat() * (radiusY - 15.dp.toPx()),
                 ),
-                strokeWidth = 2.dp.toPx(),
+                strokeWidth = 2.5.dp.toPx(),
                 cap = StrokeCap.Round,
             )
-            drawCircle(color = VeloceColors.Ink, radius = 4.dp.toPx(), center = Offset(centerX, baseline))
+            drawCircle(color = VeloceColors.Ink, radius = 4.5.dp.toPx(), center = Offset(centerX, baseline))
         }
         Row(
             modifier = Modifier
@@ -340,11 +340,14 @@ private fun LeanRecordValue(
     modifier: Modifier,
     alignment: TextAlign,
 ) {
-    Column(modifier = modifier, horizontalAlignment = when (alignment) {
-        TextAlign.Start -> Alignment.Start
-        TextAlign.End -> Alignment.End
-        else -> Alignment.CenterHorizontally
-    }) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = when (alignment) {
+            TextAlign.Start -> Alignment.Start
+            TextAlign.End -> Alignment.End
+            else -> Alignment.CenterHorizontally
+        },
+    ) {
         Text(
             "${value.displayValue()}°",
             style = MaterialTheme.typography.titleMedium,

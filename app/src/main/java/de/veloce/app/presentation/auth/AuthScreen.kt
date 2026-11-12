@@ -9,13 +9,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.DirectionsBike
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -55,57 +63,83 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
             color = VeloceColors.Surface,
-            shadowElevation = 8.dp,
+            shadowElevation = 12.dp,
         ) {
             Column(
                 modifier = Modifier
                     .padding(24.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text(
-                    when {
-                        isVerificationStep -> "E-Mail bestätigen"
-                        state.isSignUp -> "Konto erstellen"
-                        else -> "Willkommen zurück"
-                    },
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    when {
-                        isVerificationStep -> "Gib den 6-stelligen Code aus deiner E-Mail ein."
-                        state.isSignUp -> "Erstelle dein Veloce-Konto."
-                        else -> "Melde dich an und entdecke deine Fahrten."
-                    },
-                    color = VeloceColors.Muted,
-                )
-                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(VeloceColors.PaleOrange, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.DirectionsBike,
+                        contentDescription = "Veloce Logo",
+                        tint = VeloceColors.Orange,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        when {
+                            isVerificationStep -> "E-Mail bestätigen"
+                            state.isSignUp -> "Konto erstellen"
+                            else -> "Willkommen zurück"
+                        },
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        when {
+                            isVerificationStep -> "Gib den 6-stelligen Code aus deiner E-Mail ein."
+                            state.isSignUp -> "Erstelle dein Veloce-Konto."
+                            else -> "Melde dich an und entdecke deine Fahrten."
+                        },
+                        color = VeloceColors.Muted,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+
+                Spacer(Modifier.height(2.dp))
+
                 OutlinedTextField(
                     value = state.email,
                     onValueChange = viewModel::updateEmail,
                     label = { Text("E-Mail") },
+                    leadingIcon = { Icon(Icons.Outlined.Mail, contentDescription = null, tint = VeloceColors.Muted) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
                 )
+
                 if (isVerificationStep) {
                     OutlinedTextField(
                         value = code,
                         onValueChange = { code = it.filter { character -> character in '0'..'9' }.take(6) },
                         label = { Text("6-stelliger Verifizierungscode") },
+                        leadingIcon = { Icon(Icons.Outlined.Key, contentDescription = null, tint = VeloceColors.Muted) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
                     )
                 } else {
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Passwort") },
+                        leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = VeloceColors.Muted) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
                     )
                     if (state.isSignUp) {
                         Text(
@@ -115,12 +149,14 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                         )
                     }
                 }
+
                 state.error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
                 state.message?.let {
                     Text(it, color = VeloceColors.Green, style = MaterialTheme.typography.bodySmall)
                 }
+
                 Button(
                     onClick = {
                         if (isVerificationStep) viewModel.verifyCode(code)
@@ -146,9 +182,11 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                                 state.isSignUp -> "Konto erstellen"
                                 else -> "Anmelden"
                             },
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
+
                 if (isVerificationStep) {
                     TextButton(
                         onClick = { viewModel.resendVerificationCode(password) },
@@ -158,6 +196,7 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                         Text("Code erneut senden", color = VeloceColors.Muted)
                     }
                 }
+
                 TextButton(
                     onClick = viewModel::toggleMode,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -168,6 +207,7 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                         else if (isVerificationStep) "Zur Anmeldung"
                         else "Noch kein Konto? Registrieren",
                         color = VeloceColors.Muted,
+                        fontWeight = FontWeight.Medium,
                     )
                 }
             }

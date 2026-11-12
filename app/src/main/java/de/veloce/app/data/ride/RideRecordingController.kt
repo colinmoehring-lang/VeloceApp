@@ -26,7 +26,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
@@ -70,17 +69,45 @@ class RideRecordingController @Inject constructor(
 
     private var rideId: String? = null
     private var telemetryJob: Job? = null
+    private var previewJob: Job? = null
 
     init {
         scope.launch {
             settingsStore.rideDataSource.collect { dataSource ->
                 mutableState.update { it.copy(dataSource = dataSource, isLoadingSettings = false) }
+                updatePreviewObservation()
             }
         }
         scope.launch {
             bleConnection.state.collect { connectionState ->
                 mutableState.update {
                     it.copy(isArduinoConnected = connectionState is ConnectionState.Connected)
+                }
+                updatePreviewObservation()
+            }
+        }
+    }
+
+    private fun updatePreviewObservation() {
+        if (mutableState.value.isRecording) return
+
+        previewJob?.cancel()
+        val source = when (mutableState.value.dataSource) {
+            RideDataSource.SIMULATOR -> simulatorSource
+            RideDataSource.ARDUINO -> {
+                if (!mutableState.value.isArduinoConnected) {
+                    return
+                }
+                bleTelemetrySource
+            }
+        }
+
+        previewJob = scope.launch {
+            source.points().collect { point ->
+                if (!mutableState.value.isRecording) {
+                    mutableState.update { previous ->
+                        previous.copy(currentPoint = point)
+                    }
                 }
             }
         }
@@ -106,6 +133,10 @@ class RideRecordingController @Inject constructor(
                 bleTelemetrySource
             }
         }
+
+        previewJob?.cancel()
+        previewJob = null
+
         mutableState.update { it.copy(isStarting = true, error = null, stopPending = false) }
         scope.launch {
             try {
@@ -162,6 +193,7 @@ class RideRecordingController @Inject constructor(
                 mutableState.update {
                     it.copy(isStarting = false, error = exception.toDisplayMessage())
                 }
+                updatePreviewObservation()
             } catch (_: IOException) {
                 mutableState.update {
                     it.copy(
@@ -169,10 +201,10 @@ class RideRecordingController @Inject constructor(
                         error = "Fahrt konnte nicht gestartet werden. Server nicht erreichbar.",
                     )
                 }
+                updatePreviewObservation()
             }
         }
     }
-
 
     fun stopRecording() {
         if (mutableState.value.isStopping) return
@@ -204,6 +236,7 @@ class RideRecordingController @Inject constructor(
                         error = null,
                     )
                 }
+                updatePreviewObservation()
             } catch (exception: ApiException) {
                 mutableState.update {
                     it.copy(
@@ -212,6 +245,7 @@ class RideRecordingController @Inject constructor(
                         error = "Fahrt konnte nicht abgeschlossen werden: ${exception.message}",
                     )
                 }
+                updatePreviewObservation()
             } catch (_: IOException) {
                 mutableState.update {
                     it.copy(
@@ -220,6 +254,7 @@ class RideRecordingController @Inject constructor(
                         error = "Fahrt konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
                     )
                 }
+                updatePreviewObservation()
             }
         }
     }
@@ -236,4 +271,3 @@ class RideRecordingController @Inject constructor(
     private fun ApiException.toDisplayMessage(): String =
         if (message.isBlank()) "Serverfehler ($statusCode)." else "Serverfehler ($statusCode): $message"
 }
-
