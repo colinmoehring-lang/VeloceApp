@@ -19,6 +19,7 @@ fun AuthResponseDto.toDomain() = AuthSession(
     expiresInSeconds = expiresIn,
     userId = UUID.fromString(userId),
     email = email,
+    name = name,
 )
 
 fun VehicleDto.toDomain() = Vehicle(

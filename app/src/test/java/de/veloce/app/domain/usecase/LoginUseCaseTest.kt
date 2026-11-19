@@ -29,7 +29,7 @@ class LoginUseCaseTest {
             this.email = email
             this.password = password
         }
-        override suspend fun signUp(email: String, password: String) = Unit
+        override suspend fun signUp(name: String, email: String, password: String) = Unit
         override suspend fun verifyEmail(email: String, code: String) = Unit
         override suspend fun logOut() = Unit
     }

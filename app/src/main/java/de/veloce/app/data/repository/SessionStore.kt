@@ -32,6 +32,7 @@ class SessionStore @Inject constructor(
             preferences[EMAIL] = session.email
             preferences[USER_ID] = session.userId.toString()
             preferences[EXPIRES_IN] = session.expiresInSeconds
+            preferences[NAME] = session.name
         }
     }
 
@@ -48,7 +49,7 @@ class SessionStore @Inject constructor(
         } catch (_: IllegalArgumentException) {
             return null
         }
-        return AuthSession(token, this[EXPIRES_IN] ?: 0, userId, email)
+        return AuthSession(token, this[EXPIRES_IN] ?: 0, userId, email, this[NAME] ?: "")
     }
 
     private companion object {
@@ -56,5 +57,6 @@ class SessionStore @Inject constructor(
         val EMAIL = stringPreferencesKey("email")
         val USER_ID = stringPreferencesKey("user_id")
         val EXPIRES_IN = intPreferencesKey("expires_in_seconds")
+        val NAME = stringPreferencesKey("name")
     }
 }

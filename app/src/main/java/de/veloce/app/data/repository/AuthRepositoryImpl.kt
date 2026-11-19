@@ -29,9 +29,9 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signUp(email: String, password: String) {
+    override suspend fun signUp(name: String, email: String, password: String) {
         try {
-            val response = api.signUp(SignUpRequestDto(email, password))
+            val response = api.signUp(SignUpRequestDto(name = name, email = email, password = password))
             if (!response.success) {
                 throw ApiException(400, response.message.ifBlank { "Registrierung fehlgeschlagen." })
             }

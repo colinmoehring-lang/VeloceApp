@@ -7,4 +7,5 @@ data class AuthSession(
     val expiresInSeconds: Int,
     val userId: UUID,
     val email: String,
+    val name: String = "",
 )

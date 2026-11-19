@@ -5,6 +5,8 @@ import kotlinx.serialization.SerialName
 
 @Serializable
 data class SignUpRequestDto(
+    @SerialName("name")
+    val name: String,
     @SerialName("email")
     val email: String,
     val password: String,
@@ -42,4 +44,6 @@ data class AuthResponseDto(
     val userId: String,
     @SerialName("email")
     val email: String,
+    @SerialName("name")
+    val name: String = "",
 )

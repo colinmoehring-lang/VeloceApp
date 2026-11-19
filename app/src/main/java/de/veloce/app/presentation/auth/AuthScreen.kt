@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -107,6 +108,18 @@ fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
                 }
 
                 Spacer(Modifier.height(2.dp))
+
+                if (state.isSignUp && !isVerificationStep) {
+                    OutlinedTextField(
+                        value = state.name,
+                        onValueChange = viewModel::updateName,
+                        label = { Text("Name") },
+                        leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null, tint = VeloceColors.Muted) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                }
 
                 OutlinedTextField(
                     value = state.email,

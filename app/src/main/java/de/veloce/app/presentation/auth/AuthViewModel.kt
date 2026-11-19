@@ -24,6 +24,7 @@ data class AuthUiState(
     val isBusy: Boolean = false,
     val isSignUp: Boolean = false,
     val isVerificationStep: Boolean = false,
+    val name: String = "",
     val email: String = "",
     val error: String? = null,
     val message: String? = null,
@@ -49,6 +50,10 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun updateName(name: String) {
+        mutableState.update { it.copy(name = name, error = null) }
+    }
+
     fun updateEmail(email: String) {
         mutableState.update { it.copy(email = email.trim(), error = null) }
     }
@@ -58,7 +63,7 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 if (mutableState.value.isSignUp) {
-                    signUp(mutableState.value.email, password)
+                    signUp(mutableState.value.name, mutableState.value.email, password)
                     mutableState.update {
                         it.copy(
                             isBusy = false,
@@ -138,7 +143,7 @@ class AuthViewModel @Inject constructor(
         mutableState.update { it.copy(isBusy = true, error = null, message = null) }
         viewModelScope.launch {
             try {
-                signUp(mutableState.value.email, password)
+                signUp(mutableState.value.name, mutableState.value.email, password)
                 mutableState.update {
                     it.copy(
                         isBusy = false,

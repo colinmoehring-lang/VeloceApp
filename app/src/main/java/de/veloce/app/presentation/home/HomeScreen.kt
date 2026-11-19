@@ -52,6 +52,7 @@ fun HomeScreen(
     onOpenVehicles: () -> Unit,
     onOpenRides: () -> Unit,
     onLogout: () -> Unit,
+    userName: String = "",
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -79,6 +80,9 @@ fun HomeScreen(
             ) {
                 Column {
                     Text("VELOCE", style = MaterialTheme.typography.labelSmall, color = VeloceColors.Muted)
+                    if (userName.isNotBlank()) {
+                        Text("Hallo $userName", style = MaterialTheme.typography.bodyMedium, color = VeloceColors.Muted)
+                    }
                     Text("Deine Fahrten", style = MaterialTheme.typography.headlineMedium)
                 }
                 IconButton(onClick = onLogout) {

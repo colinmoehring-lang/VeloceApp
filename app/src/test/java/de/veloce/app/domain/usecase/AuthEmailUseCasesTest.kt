@@ -11,13 +11,26 @@ import org.junit.Test
 
 class AuthEmailUseCasesTest {
     @Test
-    fun `sign up trims email and delegates credentials`() = runBlocking {
+    fun `sign up trims name and email and delegates credentials`() = runBlocking {
         val repository = FakeAuthRepository()
 
-        SignUpUseCase(repository)("  veloce@example.com  ", "StrongPass1!")
+        SignUpUseCase(repository)("  Max Mustermann  ", "  veloce@example.com  ", "StrongPass1!")
 
+        assertEquals("Max Mustermann", repository.name)
         assertEquals("veloce@example.com", repository.email)
         assertEquals("StrongPass1!", repository.password)
+    }
+
+    @Test
+    fun `sign up rejects blank name`() = runBlocking {
+        val repository = FakeAuthRepository()
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { SignUpUseCase(repository)("   ", "veloce@example.com", "StrongPass1!") }
+        }
+
+        assertEquals("Bitte gib deinen Namen ein.", exception.message)
+        assertEquals(null, repository.name)
     }
 
     @Test
@@ -25,7 +38,7 @@ class AuthEmailUseCasesTest {
         val repository = FakeAuthRepository()
 
         val exception = assertThrows(IllegalArgumentException::class.java) {
-            runBlocking { SignUpUseCase(repository)("veloce@example.com", "weakpass") }
+            runBlocking { SignUpUseCase(repository)("Max Mustermann", "veloce@example.com", "weakpass") }
         }
 
         assertEquals("Das Passwort muss mindestens einen Großbuchstaben enthalten.", exception.message)
@@ -43,13 +56,15 @@ class AuthEmailUseCasesTest {
     }
 
     private class FakeAuthRepository : AuthRepository {
+        var name: String? = null
         var email: String? = null
         var password: String? = null
         var code: String? = null
 
         override fun observeSession(): Flow<AuthSession?> = flowOf(null)
         override suspend fun logIn(email: String, password: String) = Unit
-        override suspend fun signUp(email: String, password: String) {
+        override suspend fun signUp(name: String, email: String, password: String) {
+            this.name = name
             this.email = email
             this.password = password
         }

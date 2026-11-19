@@ -104,6 +104,7 @@ fun VeloceNavHost() {
                     onOpenVehicles = { navController.navigate(Routes.Vehicles) },
                     onOpenRides = { navController.navigate(Routes.RideList) },
                     onLogout = authViewModel::logOut,
+                    userName = authState.session?.name.orEmpty(),
                     viewModel = homeViewModel,
                 )
             }
