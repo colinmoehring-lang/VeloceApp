@@ -11,6 +11,7 @@ import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import dagger.Module
@@ -54,6 +55,9 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(sessionInterceptor: SessionInterceptor): OkHttpClient =
         OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(sessionInterceptor)
             .build()
 
